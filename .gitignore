@@ -1,0 +1,16 @@
+# ---- 系统与 OneDrive 临时文件 ----
+Desktop.ini
+*.tmp
+~$*
+Thumbs.db
+
+# ---- 编辑器 / 工具产生的文件 ----
+*.bak
+*.orig
+.vscode/
+.idea/
+
+# ---- 数据导出物（大数据文件不纳入版本管理）----
+*.csv
+*.xlsx
+*.log
