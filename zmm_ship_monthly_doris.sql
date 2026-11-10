@@ -6,6 +6,9 @@
 --            （3）主型号清单：ztplm008a —— ztplm008 中物料号与
 --                ZFER_DYZXHLH（对应主型号料号）相等的物料，关联 MARC
 --                带出采购类型；每次运行都重建
+--            （4）属性日快照：ztplm008b —— ztplm008 全量 LEFT JOIN
+--                MARA 带出创建日期 ERSDA，附同步日期 tbdate；
+--                每日快照留痕，当天重跑只保留最新一次，历史不删除
 --            源表（LIKP/LIPS/VBUP/MARA/MARC/ztplm008）DDL 见 doris_ods_ddl.sql，
 --            由抽数工具负责建表与灌数；本脚本仅依赖源表已存在
 -- 目标环境 : Apache Doris 4.0.2（INSERT OVERWRITE 要求 1.2+）
@@ -320,7 +323,130 @@ LEFT   JOIN PP.MARC c
 WHERE  TRIM(LEADING '0' FROM z.MATNR) = z.ZFER_DYZXHLH;  -- 去前导 0 后比较（格式归一化）
 
 -- ================================================================
--- 九、验收查询（可选执行）
+-- 九、物料属性日快照：ztplm008b（Unique 模型，62 列）
+--     结构 = ztplm008 全部 58 列 + tbdate（同步日期）+ ERSDA（创建日期）
+--            + BESKZ/SOBSL（采购类型/特殊采购类型，同 ztplm008a 口径）
+--     生成逻辑：ztplm008 全量 LEFT JOIN MARA（MANDT+MATNR 物料编码关联，
+--     MARA 含多集团须限定集团）带出 MARA.ERSDA；LEFT JOIN MARC
+--     （WERKS='1000'）带出采购类型；tbdate = CURDATE()（执行当日）
+--     快照留痕：表不 DROP（CREATE IF NOT EXISTS，仅首次建表）；
+--     每次执行先删除 tbdate=当天 的数据再插入——当天多次计算只保留
+--     最新一次，历史日期快照永不删除
+--     键 = (MANDT, MATNR, tbdate)，Unique 模型同键覆盖兜底
+--     MATNR 输出为去前导 0 格式（与 ztplm008a / 结果表一致，
+--     筛选关联用源列 18 位原值，输出层去零）
+-- ================================================================
+CREATE TABLE IF NOT EXISTS PP.ztplm008b (
+    MANDT            CHAR(3)        NOT NULL COMMENT '集团',
+    MATNR            VARCHAR(18)    NOT NULL COMMENT '物料号（去前导0）',
+    tbdate           DATE           NOT NULL COMMENT '同步日期（数据生成日，CURDATE()）',
+    MAKTX            STRING    NULL COMMENT '物料描述',
+    SPART            STRING     NULL COMMENT '产品组',
+    VTEXT            STRING     NULL COMMENT '描述',
+    MATKL            STRING     NULL COMMENT '物料组',
+    WGBEZ            STRING     NULL COMMENT '物料组描述',
+    MSTAE            STRING     NULL COMMENT '跨工厂物料状态',
+    MTSTB            STRING     NULL COMMENT '来自MM/PP视图的物料状态的描述',
+    MATNR1           STRING     NULL COMMENT '物料编号',
+    ZFER_DYZXH       STRING     NULL COMMENT '对应主型号',
+    ZFER_XL          STRING     NULL COMMENT '系列',
+    ZFER_ZXL         STRING     NULL COMMENT '子系列',
+    ZFER_PP          STRING     NULL COMMENT '品牌/厂家',
+    ZFER_RZXX        STRING     NULL COMMENT '认证信息(CE/UL)',
+    ZFER_XMH         STRING     NULL COMMENT '项目号',
+    ZFER_CPX         STRING     NULL COMMENT '产品线',
+    ZFER_XCPLX       STRING     NULL COMMENT '新产品类型',
+    ZFER_XPKS        STRING     NULL COMMENT '新品开始时间',
+    ZFER_XPJS        STRING     NULL COMMENT '新品结束时间',
+    ZFER_BMQFBL      STRING     NULL COMMENT '编码器型号',
+    ZFER_JZH         STRING     NULL COMMENT '机座号',
+    ZFER_GL          STRING     NULL COMMENT '功率',
+    ZFER_JSCD        STRING     NULL COMMENT '机身长度',
+    ZFER_LJ          STRING     NULL COMMENT '力矩',
+    ZFER_CXS         STRING     NULL COMMENT '转速',
+    ZFER_ZHC         STRING     NULL COMMENT '轴长',
+    ZFER_ZHJ         STRING     NULL COMMENT '轴径',
+    ZFER_XC          STRING     NULL COMMENT '线长',
+    ZFER_SFBZ        STRING     NULL COMMENT '是否抱闸',
+    ZFER_SFFS        STRING     NULL COMMENT '是否防水',
+    ZFER_DY          STRING     NULL COMMENT '电压',
+    ZFER_DL          STRING     NULL COMMENT '电流',
+    ZFER_XF          STRING     NULL COMMENT '细分',
+    ZFER_XHXS        STRING     NULL COMMENT '信号形式',
+    ZFER_MCXH        STRING     NULL COMMENT '脉冲信号',
+    ZFER_JXPL        STRING     NULL COMMENT '极限频率',
+    ZFER_SRSC        STRING     NULL COMMENT '输入输出',
+    ZFER_BJ          STRING     NULL COMMENT '报警',
+    ZFER_CK          STRING     NULL COMMENT '串口',
+    ZFER_BZXX        STRING     NULL COMMENT '备注信息',
+    ZFER_CPMC        STRING     NULL COMMENT '产品名称',
+    ZFER_CPXH        STRING     NULL COMMENT '产品型号',
+    ZFER_GYD         STRING     NULL COMMENT '过压点',
+    ZFER_XHLX        STRING     NULL COMMENT '型号类型',
+    ZFER_SMZQ        STRING     NULL COMMENT '生命周期',
+    ZFER_YJTCSJ      STRING     NULL COMMENT '预计/停产时间',
+    ZFER_TDXXH       STRING     NULL COMMENT '替代新型号',
+    ZFER_XLLX        STRING     NULL COMMENT '线缆类型',
+    ZFER_LB          STRING     NULL COMMENT '类别',
+    ZFER_TH          STRING     NULL COMMENT '图号',
+    ZFER_FXBM        STRING     NULL COMMENT '父项物料编码',
+    ZFER_FXXH        STRING     NULL COMMENT '父项型号/规格',
+    ZFER_DYZXHLH     STRING     NULL COMMENT '对应主型号料号',
+    ZFER_MOQ         STRING     NULL COMMENT '最小包装数',
+    ZFER_XMMC        STRING     NULL COMMENT '项目名称',
+    ZFER_XPSCPSSJ    STRING     NULL COMMENT '新品试产评审时间',
+    ZFER_GNORHW      STRING     NULL COMMENT '国内/海外',
+    ERSDA            STRING    NULL COMMENT '创建日期（MARA.ERSDA 带出，YYYYMMDD）',
+    BESKZ            STRING     NULL COMMENT '采购类型（MARC，WERKS=1000）',
+    SOBSL            STRING     NULL COMMENT '特殊采购类型（MARC，WERKS=1000）'
+)
+UNIQUE KEY(MANDT, MATNR, tbdate)
+COMMENT "物料属性日快照（ztplm008全量+MARA创建日期+MARC采购类型，按日留痕）"
+DISTRIBUTED BY HASH(MANDT, MATNR) BUCKETS 2
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+-- 先删当天已有快照（当天重跑只保留最新一次；历史日期数据不动）
+DELETE FROM PP.ztplm008b WHERE tbdate = CURDATE();
+
+INSERT INTO PP.ztplm008b
+       (MANDT, MATNR, tbdate,
+        MAKTX, SPART, VTEXT, MATKL, WGBEZ, MSTAE, MTSTB, MATNR1,
+        ZFER_DYZXH, ZFER_XL, ZFER_ZXL, ZFER_PP, ZFER_RZXX, ZFER_XMH,
+        ZFER_CPX, ZFER_XCPLX, ZFER_XPKS, ZFER_XPJS, ZFER_BMQFBL,
+        ZFER_JZH, ZFER_GL, ZFER_JSCD, ZFER_LJ, ZFER_CXS, ZFER_ZHC,
+        ZFER_ZHJ, ZFER_XC, ZFER_SFBZ, ZFER_SFFS, ZFER_DY, ZFER_DL,
+        ZFER_XF, ZFER_XHXS, ZFER_MCXH, ZFER_JXPL, ZFER_SRSC, ZFER_BJ,
+        ZFER_CK, ZFER_BZXX, ZFER_CPMC, ZFER_CPXH, ZFER_GYD, ZFER_XHLX,
+        ZFER_SMZQ, ZFER_YJTCSJ, ZFER_TDXXH, ZFER_XLLX, ZFER_LB, ZFER_TH,
+        ZFER_FXBM, ZFER_FXXH, ZFER_DYZXHLH, ZFER_MOQ, ZFER_XMMC,
+        ZFER_XPSCPSSJ, ZFER_GNORHW, ERSDA, BESKZ, SOBSL)
+SELECT z.MANDT, TRIM(LEADING '0' FROM z.MATNR) AS MATNR,   -- 物料号去前导 0 输出
+       CURDATE() AS tbdate,
+       z.MAKTX, z.SPART, z.VTEXT, z.MATKL, z.WGBEZ, z.MSTAE, z.MTSTB, z.MATNR1,
+       z.ZFER_DYZXH, z.ZFER_XL, z.ZFER_ZXL, z.ZFER_PP, z.ZFER_RZXX, z.ZFER_XMH,
+       z.ZFER_CPX, z.ZFER_XCPLX, z.ZFER_XPKS, z.ZFER_XPJS, z.ZFER_BMQFBL,
+       z.ZFER_JZH, z.ZFER_GL, z.ZFER_JSCD, z.ZFER_LJ, z.ZFER_CXS, z.ZFER_ZHC,
+       z.ZFER_ZHJ, z.ZFER_XC, z.ZFER_SFBZ, z.ZFER_SFFS, z.ZFER_DY, z.ZFER_DL,
+       z.ZFER_XF, z.ZFER_XHXS, z.ZFER_MCXH, z.ZFER_JXPL, z.ZFER_SRSC, z.ZFER_BJ,
+       z.ZFER_CK, z.ZFER_BZXX, z.ZFER_CPMC, z.ZFER_CPXH, z.ZFER_GYD, z.ZFER_XHLX,
+       z.ZFER_SMZQ, z.ZFER_YJTCSJ, z.ZFER_TDXXH, z.ZFER_XLLX, z.ZFER_LB, z.ZFER_TH,
+       z.ZFER_FXBM, z.ZFER_FXXH, z.ZFER_DYZXHLH, z.ZFER_MOQ, z.ZFER_XMMC,
+       z.ZFER_XPSCPSSJ, z.ZFER_GNORHW,
+       m.ERSDA,
+       c.BESKZ, c.SOBSL
+FROM   PP.ztplm008 z
+LEFT   JOIN PP.MARA m
+       ON  m.MANDT = z.MANDT          -- MARA 含多集团，须限定集团
+       AND m.MATNR = z.MATNR          -- 物料编码 18 位原值直接关联
+LEFT   JOIN PP.MARC c
+       ON  c.MANDT = z.MANDT
+       AND c.MATNR = z.MATNR
+       AND c.WERKS = '1000';          -- 工厂默认取 1000；主键含 WERKS，等值关联不放大行数
+
+-- ================================================================
+-- 十、验收查询（可选执行）
 -- ================================================================
 -- 行数 / 月份 / 物料数 / 总量核对（结果表总量应与明细聚合一致）
 -- SELECT COUNT(*) AS total_rows, COUNT(DISTINCT ship_month) AS month_cnt,
@@ -332,6 +458,9 @@ WHERE  TRIM(LEADING '0' FROM z.MATNR) = z.ZFER_DYZXHLH;  -- 去前导 0 后比�
 -- SELECT COUNT(*) FROM PP.zmm_ship_monthly
 -- WHERE net_qty <> ship_qty - return_qty OR matnr LIKE '0%' OR meins = 'ST'
 --    OR (ship_qty = 0 AND return_qty = 0);
+
+-- ztplm008b 当日快照行数核对（应与 ztplm008 当日全量行数一致）
+-- SELECT tbdate, COUNT(*) FROM PP.ztplm008b WHERE tbdate = CURDATE() GROUP BY tbdate;
 
 -- ================================================================
 -- 附：部署注意事项
