@@ -2,12 +2,13 @@
 -- 文件名   : doris_ods_ddl.sql
 -- 功能     : SAP 贴源表建表 DDL（Apache Doris 4.0.2）—— 供抽数工具使用
 --            LIKP（185列）/ LIPS（308列）/ VBUP（44列）/
---            MARA（229列）/ ztplm008（58列）/ MARC（250列）
+--            MARA（229列）/ ztplm008（58列）/ MARC（250列）/
+--            ZTPP_015（58列）
 -- 数据库   : PP @ 192.168.220.37:9030
 -- 说明     : 仅建表语句，数据由您的抽数工具负责灌入。
 --            结果表与统计脚本见 zmm_ship_monthly_doris.sql。
 --            每次运行都重建（先 DROP 再 CREATE）：执行本文件会清空
---            六张源表数据，结构变更即时生效，不残留旧列；重建后需重新抽数。
+--            七张源表数据，结构变更即时生效，不残留旧列；重建后需重新抽数。
 --            源表统计要点：WADAT_IST 为 YYYYMMDD 字符串；LIPS 批次拆分
 --            子行 POSNR>=900001 承载实际数量；表已于 2026-09-29 在
 --            PP 实际执行验证通过（replication_num=1，生产请调整）
@@ -1173,6 +1174,83 @@ CREATE TABLE MARC (
 DUPLICATE KEY(MANDT, MATNR, WERKS)
 COMMENT "MARC 物料工厂级数据（SAP 贴源）"
 DISTRIBUTED BY HASH(MANDT, MATNR, WERKS) BUCKETS 8
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+
+-- ================================================================
+-- 七、贴源表 7：ZTPP_015 —— 物料计划出货库存汇总（58 列）
+--     源：SAP 透明表 ZTPP_015，主键 (MANDT, MATNR)；
+--     文本列 STRING（含中文描述），数值列 DECIMAL(13,0) 保持数值语义
+--     DUPLICATE KEY(MANDT, MATNR)；
+--     分桶 HASH(MANDT, MATNR) BUCKETS 1（单 BE 环境）
+--     每次运行都重建：先 DROP 再 CREATE，重建后需重新抽数
+-- ================================================================
+DROP TABLE IF EXISTS ZTPP_015;
+CREATE TABLE ZTPP_015 (
+    MANDT       CHAR(3)        NOT NULL COMMENT '集团',
+    MATNR       VARCHAR(18)    NOT NULL COMMENT '物料编号',
+    MAKTX       STRING     NULL COMMENT '物料描述',
+    ZSTAT       STRING     NULL COMMENT '状态',
+    SPART       STRING     NULL COMMENT '产品组',
+    VTEXT_SPART STRING     NULL COMMENT '描述',
+    DISPO       STRING     NULL COMMENT 'MRP控制者',
+    MATKL       STRING     NULL COMMENT '物料组',
+    WGBEZ_MATKL STRING     NULL COMMENT '物料组描述',
+    MSTAE       STRING     NULL COMMENT '跨工厂物料状态',
+    ZCPXH       STRING     NULL COMMENT '主型号',
+    ZCPX        STRING     NULL COMMENT '产品线',
+    ZSMZQ       STRING     NULL COMMENT '生命周期',
+    ZXHLX       STRING     NULL COMMENT '型号类型',
+    ZBYJH       DECIMAL(13,0)  NULL COMMENT '当月销售计划数',
+    ZXSCK       DECIMAL(13,0)  NULL COMMENT '当月实际销售出库数',
+    ZXSCK1      DECIMAL(13,0)  NULL COMMENT '上月实际销售出库数',
+    ZXSCK2      DECIMAL(13,0)  NULL COMMENT '上上月实际销售出库数',
+    ZXSDCL      DECIMAL(13,0)  NULL COMMENT '当月销售发货达成率%',
+    ZXSBG       DECIMAL(13,0)  NULL COMMENT '销售计划变更数',
+    ZXSBG1      DECIMAL(13,0)  NULL COMMENT '销售计划变更待确认数',
+    ZXSBGL      DECIMAL(13,0)  NULL COMMENT '销售计划变更率',
+    ZKCS        DECIMAL(13,0)  NULL COMMENT '库存数',
+    ZZZPS       DECIMAL(13,0)  NULL COMMENT '工单下达数及采购在途数',
+    ZSPEME      DECIMAL(13,0)  NULL COMMENT '已冻结数',
+    XSFH        DECIMAL(13,0)  NULL COMMENT '半年月平均销售数',
+    YSFH        DECIMAL(13,0)  NULL COMMENT '一年月平均销售数',
+    ZWJSL       DECIMAL(13,0)  NULL COMMENT '3个月内未交订单数量',
+    ZPLAF1      DECIMAL(13,0)  NULL COMMENT '当月计划订单数',
+    ZPLAF2      DECIMAL(13,0)  NULL COMMENT '下月计划订单数',
+    ZPLAF3      DECIMAL(13,0)  NULL COMMENT '下下月计划订单数',
+    BDMNG       DECIMAL(13,0)  NULL COMMENT '预留的',
+    BDMNS       DECIMAL(13,0)  NULL COMMENT '接收预留',
+    OMENG       DECIMAL(13,0)  NULL COMMENT '交货计划',
+    Z1100       DECIMAL(13,0)  NULL COMMENT '更改仓',
+    Z1800       DECIMAL(13,0)  NULL COMMENT '海外备品仓',
+    Z1500       DECIMAL(13,0)  NULL COMMENT '百广源仓',
+    Z1070       DECIMAL(13,0)  NULL COMMENT '智园临时仓',
+    Z1380       DECIMAL(13,0)  NULL COMMENT '试用仓',
+    Z1010       DECIMAL(13,0)  NULL COMMENT '原材料仓',
+    Z1140       DECIMAL(13,0)  NULL COMMENT '待喷漆仓',
+    Z1020       DECIMAL(13,0)  NULL COMMENT '成品仓',
+    Z1390       DECIMAL(13,0)  NULL COMMENT '东莞分仓',
+    Z1530       DECIMAL(13,0)  NULL COMMENT '安科讯待喷漆仓',
+    Z3020       DECIMAL(13,0)  NULL COMMENT '华东仓',
+    Z3070       DECIMAL(13,0)  NULL COMMENT '雷智仓',
+    Z4010       DECIMAL(13,0)  NULL COMMENT '济南仓',
+    Z5010       DECIMAL(13,0)  NULL COMMENT '海外电机仓',
+    Z2043       DECIMAL(13,0)  NULL COMMENT '电机车间现场仓',
+    Z1520       DECIMAL(13,0)  NULL COMMENT '安科讯仓',
+    Z1540       DECIMAL(13,0)  NULL COMMENT '三一智造外协仓',
+    Z1550       DECIMAL(13,0)  NULL COMMENT '拓睿璞外协仓',
+    Z1560       DECIMAL(13,0)  NULL COMMENT '华复试用仓',
+    Z1580       DECIMAL(13,0)  NULL COMMENT '比亚迪仓',
+    Z1250       DECIMAL(13,0)  NULL COMMENT '接插件销售仓',
+    Z1384       DECIMAL(13,0)  NULL COMMENT '试用待喷漆仓',
+    Z1860       DECIMAL(13,0)  NULL COMMENT '海外电商仓',
+    Z4020       DECIMAL(13,0)  NULL COMMENT '电机原材料仓'
+)
+DUPLICATE KEY(MANDT, MATNR)
+COMMENT "物料计划出货库存汇总（贴源，业务键MANDT+MATNR）"
+DISTRIBUTED BY HASH(MANDT, MATNR) BUCKETS 1
 PROPERTIES (
     "replication_num" = "1"
 );
