@@ -3,7 +3,7 @@
 -- 功能     : SAP 贴源表建表 DDL（Apache Doris 4.0.2）—— 供抽数工具使用
 --            LIKP（185列）/ LIPS（308列）/ VBUP（44列）/
 --            MARA（229列）/ ztplm008（58列）/ MARC（250列）/
---            ZTPP_015（58列）
+--            ZTPP_015（59列）
 -- 数据库   : PP @ 192.168.220.37:9030
 -- 说明     : 仅建表语句，数据由您的抽数工具负责灌入。
 --            结果表与统计脚本见 zmm_ship_monthly_doris.sql。
@@ -1180,7 +1180,7 @@ PROPERTIES (
 
 
 -- ================================================================
--- 七、贴源表 7：ZTPP_015 —— 物料计划出货库存汇总（58 列）
+-- 七、贴源表 7：ZTPP_015 —— 物料计划出货库存汇总（59 列）
 --     源：SAP 透明表 ZTPP_015，主键 (MANDT, MATNR)；
 --     文本列 STRING（含中文描述），数值列 DECIMAL(13,0) 保持数值语义
 --     DUPLICATE KEY(MANDT, MATNR)；
@@ -1201,6 +1201,7 @@ CREATE TABLE ZTPP_015 (
     MSTAE       STRING     NULL COMMENT '跨工厂物料状态',
     ZCPXH       STRING     NULL COMMENT '主型号',
     ZCPX        STRING     NULL COMMENT '产品线',
+    ZFER_CPXH   STRING     NULL COMMENT '产品型号',
     ZSMZQ       STRING     NULL COMMENT '生命周期',
     ZXHLX       STRING     NULL COMMENT '型号类型',
     ZBYJH       DECIMAL(13,0)  NULL COMMENT '当月销售计划数',
